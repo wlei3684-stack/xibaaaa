@@ -1,6 +1,6 @@
 {
   "config_version": 1,
-  "implementation_status": "Training recipe only: training loop, losses and optimizer construction are not implemented yet.",
+  "implementation_status": "Implemented: python -m training --config configs/train_mixed_60ep.json",
   "path_base": "repository_root",
   "model": {
     "factory": "classification.models.tracking.vmamba_tiny_tracker",
@@ -106,7 +106,9 @@
       "model",
       "optimizer",
       "scheduler",
+      "scaler",
       "epoch",
+      "best",
       "rng",
       "config"
     ],
