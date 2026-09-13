@@ -57,3 +57,7 @@ detection/1.ipynb
 detection/bears.jpg
 classification/1.ipynb
 1.txt
+
+# Local tracking environment and pretrained weights
+.venv/
+pretrained/

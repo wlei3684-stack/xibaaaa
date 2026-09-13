@@ -29,6 +29,11 @@ try:
 except:
     from csms6s import selective_scan_fn, selective_scan_flop_jit
 
+try:
+    from .pair_scan import pair_scan, pair_merge
+except ImportError:
+    from pair_scan import pair_scan, pair_merge
+
 # FLOPs counter not prepared fro mamba2
 try:
     from .mamba2.ssd_minimal import selective_scan_chunk_fn
@@ -514,10 +519,18 @@ class SS2Dv2:
         channel_first = self.channel_first
         to_fp32 = lambda *args: (_a.to(torch.float32) for _a in args)
 
-        B, D, H, W = x.shape
+        paired = isinstance(x, tuple)
+        if paired:
+            t, s = x
+            B, D, H, W = t.shape
+            search_hw = s.shape[-2:]
+            if _scan_mode != 0 or not channel_first:
+                raise ValueError("Paired scanning requires channel-first cross2d")
+        else:
+            B, D, H, W = x.shape
         N = self.d_state
         K, D, R = self.k_group, self.d_inner, self.dt_rank
-        L = H * W
+        L = H * W + (s.shape[-2] * s.shape[-1] if paired else 0)
 
         def selective_scan(u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=True):
             return selective_scan_fn(u, delta, A, B, C, D, delta_bias, delta_softplus, ssoflex, backend=selective_scan_backend)
@@ -600,7 +613,8 @@ class SS2Dv2:
             y = y_col
         else:
             x_proj_bias = getattr(self, "x_proj_bias", None)
-            xs = cross_scan_fn(x, in_channel_first=True, out_channel_first=True, scans=_scan_mode, force_torch=scan_force_torch)
+            xs = (pair_scan(t, s, force_torch=scan_force_torch) if paired else
+                  cross_scan_fn(x, in_channel_first=True, out_channel_first=True, scans=_scan_mode, force_torch=scan_force_torch))
             if no_einsum:
                 x_dbl = F.conv1d(xs.view(B, -1, L), self.x_proj_weight.view(-1, D, 1), bias=(x_proj_bias.view(-1) if x_proj_bias is not None else None), groups=K)
                 dts, Bs, Cs = torch.split(x_dbl.view(B, K, -1, L), [R, N, N], dim=2)
@@ -627,7 +641,11 @@ class SS2Dv2:
 
             ys: torch.Tensor = selective_scan(
                 xs, dts, As, Bs, Cs, Ds, delta_bias, delta_softplus
-            ).view(B, K, -1, H, W)
+            )
+            if paired:
+                yt, ys = pair_merge(ys.view(B, K, -1, L), (H, W), search_hw, force_torch=scan_force_torch)
+                return out_norm(yt).to(t.dtype), out_norm(ys).to(s.dtype)
+            ys = ys.view(B, K, -1, H, W)
             
             y: torch.Tensor = cross_merge_fn(ys, in_channel_first=True, out_channel_first=True, scans=_scan_mode, force_torch=scan_force_torch)
 
@@ -646,6 +664,14 @@ class SS2Dv2:
         return y.to(x.dtype)
 
     def forwardv2(self, x: torch.Tensor, **kwargs):
+        if isinstance(x, tuple):
+            if not self.channel_first or not self.disable_z:
+                raise ValueError("Paired inputs require channel-first and disabled gate")
+            t, s = (self.in_proj(item) for item in x)
+            if self.with_dconv:
+                t, s = self.conv2d(t), self.conv2d(s)
+            t, s = self.forward_core((self.act(t), self.act(s)))
+            return tuple(self.dropout(self.out_proj(self.out_act(item))) for item in (t, s))
         x = self.in_proj(x)
         if not self.disable_z:
             x, z = x.chunk(2, dim=(1 if self.channel_first else -1)) # (b, h, w, d)
@@ -1220,6 +1246,17 @@ class VSSBlock(nn.Module):
             self.mlp = _MLP(in_features=hidden_dim, hidden_features=mlp_hidden_dim, act_layer=mlp_act_layer, drop=mlp_drop_rate, channels_first=channel_first)
 
     def _forward(self, input: torch.Tensor):
+        if isinstance(input, tuple):
+            if self.post_norm:
+                raise ValueError("Paired VSSBlock requires pre-norm")
+            t, s = input
+            if self.ssm_branch:
+                ot, os = self.op((self.norm(t), self.norm(s)))
+                t, s = t + self.drop_path(ot), s + self.drop_path(os)
+            if self.mlp_branch:
+                t = t + self.drop_path(self.mlp(self.norm2(t)))
+                s = s + self.drop_path(self.mlp(self.norm2(s)))
+            return t, s
         x = input
         if self.ssm_branch:
             if self.post_norm:
@@ -1234,6 +1271,8 @@ class VSSBlock(nn.Module):
         return x
 
     def forward(self, input: torch.Tensor):
+        if self.use_checkpoint and isinstance(input, tuple):
+            return checkpoint.checkpoint(lambda t, s: self._forward((t, s)), *input, use_reentrant=False)
         if self.use_checkpoint:
             return checkpoint.checkpoint(self._forward, input)
         else:
