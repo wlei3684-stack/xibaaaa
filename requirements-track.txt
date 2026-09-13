@@ -10,3 +10,7 @@ numpy
 # unrelated package named selective_scan.
 
 opencv-python-headless>=4.8
+
+pandas
+
+pycocotools

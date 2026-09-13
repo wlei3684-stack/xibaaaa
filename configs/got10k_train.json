@@ -1,6 +1,6 @@
 {
-  "batch_size": 2,
-  "num_workers": 4,
+  "batch_size": 32,
+  "num_workers": 10,
   "samples_per_epoch": 60000,
   "seed": 0,
   "max_gap": 200,
@@ -15,5 +15,13 @@
   ],
   "weights": [
     1
-  ]
+  ],
+  "template_size": 128,
+  "search_size": 256,
+  "template_factor": 2.0,
+  "search_factor": 4.0,
+  "template_center_jitter": 0,
+  "template_scale_jitter": 0,
+  "search_center_jitter": 3,
+  "search_scale_jitter": 0.25
 }
