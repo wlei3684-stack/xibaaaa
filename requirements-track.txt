@@ -8,3 +8,5 @@ numpy
 # Optional speed backends: see kernels/selective_scan/README.md to build selective_scan
 # and install Triton on a supported platform. Do not replace these with an
 # unrelated package named selective_scan.
+
+opencv-python-headless>=4.8

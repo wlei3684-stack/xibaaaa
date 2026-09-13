@@ -1,0 +1,19 @@
+{
+  "batch_size": 2,
+  "num_workers": 4,
+  "samples_per_epoch": 60000,
+  "seed": 0,
+  "max_gap": 200,
+  "max_attempts": 20,
+  "training": true,
+  "datasets": [
+    {
+      "type": "got10k",
+      "root": "/data/got10k/train",
+      "split": "vottrain"
+    }
+  ],
+  "weights": [
+    1
+  ]
+}

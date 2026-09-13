@@ -1,0 +1,50 @@
+{
+  "batch_size": 2,
+  "num_workers": 4,
+  "samples_per_epoch": 60000,
+  "seed": 0,
+  "max_gap": 200,
+  "max_attempts": 20,
+  "training": true,
+  "datasets": [
+    {
+      "type": "lasot",
+      "root": "/data/lasot",
+      "split": "train"
+    },
+    {
+      "type": "got10k",
+      "root": "/data/got10k/train",
+      "split": "vottrain"
+    },
+    {
+      "type": "trackingnet",
+      "root": "/data/trackingnet",
+      "sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    {
+      "type": "coco",
+      "root": "/data/coco/images/train2017",
+      "annotations": "/data/coco/annotations/instances_train2017.json"
+    }
+  ],
+  "weights": [
+    1,
+    1,
+    1,
+    1
+  ]
+}
