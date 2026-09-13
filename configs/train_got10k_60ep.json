@@ -1,0 +1,122 @@
+{
+  "config_version": 1,
+  "implementation_status": "Training recipe only: training loop, losses and optimizer construction are not implemented yet.",
+  "path_base": "repository_root",
+  "model": {
+    "factory": "classification.models.tracking.vmamba_tiny_tracker",
+    "pretrained": "pretrained/vssm1_tiny_0230s_ckpt_epoch_264.pth",
+    "head_pretrained": "pretrained/OSTrack_ep0300.pth.tar",
+    "head_checkpoint_variant": "OSTrack-256 ViT-B CENTER, input768/head256",
+    "require_pretrained_backbone": true,
+    "require_pretrained_head": true,
+    "pretrained_load_policy": "strict; abort on missing files or incompatible weights",
+    "fusion_init": "random",
+    "projection_init": "random",
+    "freeze_modules": [],
+    "use_checkpoint": false
+  },
+  "training": {
+    "epochs": 60,
+    "seed": 0,
+    "amp": false,
+    "gradient_accumulation_steps": 1,
+    "gradient_clip_max_norm": 0.1,
+    "minimum_batch_size_per_rank": 2,
+    "automatic_lr_scaling": false
+  },
+  "optimizer": {
+    "type": "AdamW",
+    "weight_decay": 0.0001,
+    "betas": [
+      0.9,
+      0.999
+    ],
+    "eps": 1e-08,
+    "parameter_groups": [
+      {
+        "name": "backbone",
+        "parameter_prefix": "backbone.",
+        "lr": 4e-05
+      },
+      {
+        "name": "pretrained_head",
+        "parameter_prefix": "box_head.",
+        "lr": 4e-05
+      },
+      {
+        "name": "fusion",
+        "parameter_prefix": "fusion.",
+        "lr": 0.0004
+      },
+      {
+        "name": "projection",
+        "parameter_prefix": "projection.",
+        "lr": 0.0004
+      }
+    ],
+    "require_every_trainable_parameter_exactly_once": true
+  },
+  "scheduler": {
+    "type": "StepLR",
+    "step_size": 48,
+    "gamma": 0.1,
+    "step_when": "after_training_epoch",
+    "epoch_numbering": "one_based; epochs1-48 initial LR, epochs49-60 LR x0.1"
+  },
+  "loss": {
+    "reference": "OSTrack 33b5e12586216b7fd0e95d255bd01ba44cbec759 lib/train/actors/ostrack.py",
+    "giou_weight": 2.0,
+    "l1_weight": 5.0,
+    "focal_weight": 1.0,
+    "heatmap_generator": "OSTrack generate_heatmap",
+    "search_size": 256,
+    "stride": 16,
+    "heatmap_size": 16,
+    "annotation_format": "normalized_xywh",
+    "prediction_format": "normalized_cxcywh",
+    "box_loss_format": "xyxy",
+    "clamp_target_xyxy": [
+      0.0,
+      1.0
+    ],
+    "pass_gt_heatmap_to_head": false,
+    "independent_size_offset_losses": false
+  },
+  "validation": {
+    "interval_epochs": 5,
+    "run_on_final_epoch": true,
+    "augmentation": "official OSTrack joint augmentation and crop jitter retained",
+    "metrics": [
+      "loss_total",
+      "loss_giou",
+      "loss_l1",
+      "loss_focal",
+      "mean_box_iou"
+    ],
+    "best_checkpoint_metric": "loss_total",
+    "best_checkpoint_mode": "min",
+    "benchmark_tracking_evaluation": false
+  },
+  "checkpoint": {
+    "resume": null,
+    "save_last_every_epoch": true,
+    "save_every_epochs": 5,
+    "save_best": true,
+    "save_states": [
+      "model",
+      "optimizer",
+      "scheduler",
+      "epoch",
+      "rng",
+      "config"
+    ],
+    "resume_policy": "restore complete training state; do not reinitialize pretrained modules",
+    "output_dir": "outputs/got10k_60ep"
+  },
+  "data": {
+    "train_config": "configs/got10k_train.json",
+    "val_config": "configs/got10k_val.json",
+    "batch_size_semantics": "per_rank",
+    "model_input_adapter": "tracking_data.model_inputs"
+  }
+}

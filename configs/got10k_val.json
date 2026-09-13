@@ -23,5 +23,6 @@
   "template_center_jitter": 0,
   "template_scale_jitter": 0,
   "search_center_jitter": 3,
-  "search_scale_jitter": 0.25
+  "search_scale_jitter": 0.25,
+  "val_epoch_interval": 5
 }
