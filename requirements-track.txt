@@ -5,6 +5,6 @@ timm
 fvcore
 einops
 numpy
-# Optional speed backends: follow the upstream README to build selective_scan
+# Optional speed backends: see kernels/selective_scan/README.md to build selective_scan
 # and install Triton on a supported platform. Do not replace these with an
 # unrelated package named selective_scan.
